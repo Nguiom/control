@@ -1,27 +1,80 @@
 #include <OneWire.h>                
 #include <DallasTemperature.h>
 
-int pwmPin = 6;
-int pwmV=120;
-float ref=45;
-float refTol=ref*0.05;
+const int pwmPin = 9;
+const int bus=2;
+const int Uunits =100;
+const int pwmRes =12;  
+const int pwmMax =4095;
 
-OneWire ourWire(2);
-bool inicio =1;
-
+OneWire ourWire(bus);
 DallasTemperature sensors(&ourWire);
+
+float tempF=0.0;
+unsigned int pwmV=0;
+float ref=45;
+float U_op = 50.0; // Direct Control Output - FOR OPENLOOP or FEEDFORWARD - Transistor Collector Current [mA]
+float U_t = 0.0; // Control Output
+
+// Execution Time Control
+unsigned long pTime = 0;
+unsigned long dTime = 0;
+long previousMillis = 0;  // For main loop function
+long Ts = 1000; // Sample time in ms
+long previousMillis2 = 0; // For auxiliary functions (squarewaves)
+bool up = true;
+int i = 0;
+
+const byte numChars = 32;
+char receivedChars[numChars];
+boolean newData = false;
+
+void calibracion(void){
+  // Measurement, Control, Output Command Signal, Serial Data Communication
+  unsigned long currentMillis = millis(); // Update current time from the beginning
+  if (currentMillis - previousMillis >= Ts) {
+    previousMillis = currentMillis;
+    TempSensor.requestTemperatures();  
+    tempF = TempSensor.getTempCByIndex(0); 
+    float U_t = U_op;   
+    float U_tl = min(max(U_t, 0), Uunits); // Saturated Control Output
+    pwmV = int((U_tl/Uunits)*pwmMax);
+    analogWriteADJ(pwmPin, pwmV);
+    
+  
+    Serial.print("U:");
+    Serial.print(U_t);
+    Serial.print(",");
+
+    Serial.print("tempF:");
+    Serial.println(tempF);     
+  }
+
+
+
+  // Advanced Serial Input Functions
+  recvWithStartEndMarkers();  
+  if (newData == true) {
+    parseData();
+    newData = false;
+  }
+  
+}
 
 void setup() {
   // put your setup code here, to run once:
-  delay(1000);
-  Serial.begin(9600);
+  Serial.begin(115200);
   sensors.begin();
+  sensor.setResolution(12);
   pinMode(LED_BUILTIN, OUTPUT);
+  setupPWMadj();
+  analogWriteADJ(pwmPin, pwmV);
+  delay(5000);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  if (inicio){
+  /*if (inicio){
     inicio=0;
     digitalWrite(LED_BUILTIN, HIGH);
     delay(10000);
@@ -38,5 +91,66 @@ void loop() {
   } else if(temp<(ref-refTol)){
     pwmV=pwmV+1;
   }
-  delay(1000);
+  delay(1000);*/
+  calibracion();
+}
+
+/* Configure digital pins 9 and 10 as 12-bit PWM outputs (3905 Hz). */
+void setupPWMadj() {
+  DDRB |= _BV(PB1) | _BV(PB2);        /* set pins as outputs */
+  TCCR1A = _BV(COM1A1) | _BV(COM1B1)  /* non-inverting PWM */
+      | _BV(WGM11);                   /* mode 14: fast PWM, TOP=ICR1 */
+  TCCR1B = _BV(WGM13) | _BV(WGM12)
+      | _BV(CS10);                    /* no prescaling */
+  ICR1 = 0x0fff;                      /* TOP counter value - SETS RESOLUTION/FREQUENCY */
+}
+
+/* 12-bit version of analogWrite(). Works only on pins 9 and 10. (MAX VAL=4095) */
+void analogWriteADJ(uint8_t pin, uint16_t val){
+  switch (pin) {
+    case  9: OCR1A = val; break;
+    case 10: OCR1B = val; break;
+    }
+}
+
+//============ Advanced Serial Input Functions
+
+void recvWithStartEndMarkers() {
+    static boolean recvInProgress = false;
+    static byte ndx = 0;
+    char startMarker = '<'; // Serial input must start with this character
+    char endMarker = '>'; // Serial input must end with this character
+    char rc;
+
+    while (Serial.available() > 0 && newData == false) {
+        rc = Serial.read();
+
+        if (recvInProgress == true) {
+            if (rc != endMarker) {
+                receivedChars[ndx] = rc;
+                ndx++;
+                if (ndx >= numChars) {
+                    ndx = numChars - 1;
+                }
+            }
+            else {
+                receivedChars[ndx] = '\0'; // terminate the string
+                recvInProgress = false;
+                ndx = 0;
+                newData = true;
+            }
+        }
+
+        else if (rc == startMarker) {
+            recvInProgress = true;
+        }
+    }
+}
+
+//============
+
+void parseData() {      // split the data into its parts
+
+    Ref = atof(receivedChars);     // convert serial input to a float and update System Reference value with that value
+
 }
