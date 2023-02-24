@@ -2,7 +2,7 @@
 #include <DallasTemperature.h>
 
 const int pwmPin = 9;
-const int bus=2;
+const int bus=8;
 const int Uunits =100;
 const int pwmRes =12;  
 const int pwmMax =4095;
@@ -17,8 +17,8 @@ float U_op = 50.0; // Direct Control Output - FOR OPENLOOP or FEEDFORWARD - Tran
 float U_t = 0.0; // Control Output
 
 // Execution Time Control
-unsigned long pTime = 0;
-unsigned long dTime = 0;
+long unsigned int pTime = 0;
+long unsigned int dTime = 0;
 long previousMillis = 0;  // For main loop function
 long Ts = 1000; // Sample time in ms
 long previousMillis2 = 0; // For auxiliary functions (squarewaves)
@@ -34,9 +34,9 @@ void calibracion(void){
   unsigned long currentMillis = millis(); // Update current time from the beginning
   if (currentMillis - previousMillis >= Ts) {
     previousMillis = currentMillis;
-    TempSensor.requestTemperatures();  
-    tempF = TempSensor.getTempCByIndex(0); 
-    float U_t = U_op;   
+    sensors.requestTemperatures();  
+    tempF = sensors.getTempCByIndex(0); 
+    U_t = U_op;   
     float U_tl = min(max(U_t, 0), Uunits); // Saturated Control Output
     pwmV = int((U_tl/Uunits)*pwmMax);
     analogWriteADJ(pwmPin, pwmV);
@@ -65,10 +65,14 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   sensors.begin();
-  sensor.setResolution(12);
-  pinMode(LED_BUILTIN, OUTPUT);
+  sensors.setResolution(12);
   setupPWMadj();
   analogWriteADJ(pwmPin, pwmV);
+  int clear=0;
+  while(clear<10){
+    Serial.println();
+  clear=clear +1;    
+  }
   delay(5000);
 }
 
@@ -151,6 +155,6 @@ void recvWithStartEndMarkers() {
 
 void parseData() {      // split the data into its parts
 
-    Ref = atof(receivedChars);     // convert serial input to a float and update System Reference value with that value
+    ref = atof(receivedChars);     // convert serial input to a float and update System Reference value with that value
 
 }
