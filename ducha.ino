@@ -15,6 +15,7 @@ unsigned int pwmV=0;
 float ref=45;
 float U_op = 50.0; // Direct Control Output - FOR OPENLOOP or FEEDFORWARD - Transistor Collector Current [mA]
 float U_t = 0.0; // Control Output
+float U_id=0;
 
 // Execution Time Control
 long unsigned int pTime = 0;
@@ -41,6 +42,49 @@ void calibracion(void){
     pwmV = int((U_tl/Uunits)*pwmMax);
     analogWriteADJ(pwmPin, pwmV);
     
+  
+    Serial.print("U:");
+    Serial.print(U_t);
+    Serial.print(",");
+
+    Serial.print("tempF:");
+    Serial.println(tempF);     
+  }
+
+
+
+  // Advanced Serial Input Functions
+  recvWithStartEndMarkers();  
+  if (newData == true) {
+    parseData();
+    newData = false;
+  }
+  
+}
+
+void ident(void){
+  // Measurement, Control, Output Command Signal, Serial Data Communication
+  unsigned long currentMillis = millis(); // Update current time from the beginning
+  if (currentMillis - previousMillis >= Ts) {
+    previousMillis = currentMillis;
+    sensors.requestTemperatures();  
+    tempF = sensors.getTempCByIndex(0); 
+    U_t = U_id+U_op;   
+    float U_tl = min(max(U_t, 0), Uunits); // Saturated Control Output
+    pwmV = int((U_tl/Uunits)*pwmMax);
+    analogWriteADJ(pwmPin, pwmV);
+    
+    if (currentMillis >= 60000 && currentMillis-previousMillis2 >= 30000) {
+    i++;
+    previousMillis2 = currentMillis; // refresh the last time you RUN
+    if (up){
+      U_id = 10;
+      up = false;
+    } else {
+       U_id = 0;
+      up = true;
+    }
+  }
   
     Serial.print("U:");
     Serial.print(U_t);
@@ -96,7 +140,7 @@ void loop() {
     pwmV=pwmV+1;
   }
   delay(1000);*/
-  calibracion();
+  ident();
 }
 
 /* Configure digital pins 9 and 10 as 12-bit PWM outputs (3905 Hz). */
