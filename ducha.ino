@@ -12,10 +12,16 @@ DallasTemperature sensors(&ourWire);
 
 float tempF=0.0;
 unsigned int pwmV=0;
-float ref=45;
+float ref=37;
 float U_op = 50.0; // Direct Control Output - FOR OPENLOOP or FEEDFORWARD - Transistor Collector Current [mA]
 float U_t = 0.0; // Control Output
 float U_id=0;
+float errorP=0;
+float errorI=0;
+float errorD=0;
+float errorL=0;
+float m=3.82;
+float kp, ki, kd;
 
 // Execution Time Control
 long unsigned int pTime = 0;
@@ -29,6 +35,49 @@ int i = 0;
 const byte numChars = 32;
 char receivedChars[numChars];
 boolean newData = false;
+
+void SetTunings(double Kp, double Ki, double Kd)
+{
+   kp = Kp;
+   ki = Ki;
+   kd = Kd;
+}
+
+void compute(void){
+  unsigned long currentMillis = millis(); // Update current time from the beginning
+  if (currentMillis - previousMillis >= Ts) {
+    previousMillis = currentMillis;
+    sensors.requestTemperatures();  
+    tempF = sensors.getTempCByIndex(0); 
+    errorP=ref-tempF;
+    errorI=errorI+(errorP*Ts);
+    errorD=(errorP-errorL)/Ts;
+    
+    
+    U_t = (kp*errorP)*m+U_op;   
+    float U_tl = min(max(U_t, 0), Uunits); // Saturated Control Output
+    pwmV = int((U_tl/Uunits)*pwmMax);
+    analogWriteADJ(pwmPin, pwmV);
+    
+  
+    Serial.print("U:");
+    Serial.print(U_t);
+    Serial.print(",");
+
+    Serial.print("tempF:");
+    Serial.println(tempF);     
+  }
+
+
+
+  // Advanced Serial Input Functions
+  recvWithStartEndMarkers();  
+  if (newData == true) {
+    parseData();
+    newData = false;
+  }  
+  
+}
 
 void calibracion(void){
   // Measurement, Control, Output Command Signal, Serial Data Communication
@@ -116,31 +165,13 @@ void setup() {
   while(clear<10){
     Serial.println();
   clear=clear +1;    
-  }
+  }  
+  SetTunings(1,0,0);
   delay(5000);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  /*if (inicio){
-    inicio=0;
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(10000);
-    digitalWrite(LED_BUILTIN, LOW);
-  } 
-  analogWrite(pwmPin,pwmV);
-  sensors.requestTemperatures();
-  float temp= sensors.getTempCByIndex(0);
-  Serial.print("Temperatura= ");
-  Serial.print(temp);
-  Serial.println(" C");
-  if(temp>(ref+refTol)){
-    pwmV=pwmV-1;
-  } else if(temp<(ref-refTol)){
-    pwmV=pwmV+1;
-  }
-  delay(1000);*/
-  ident();
+  compute()
 }
 
 /* Configure digital pins 9 and 10 as 12-bit PWM outputs (3905 Hz). */
