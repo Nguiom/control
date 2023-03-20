@@ -173,7 +173,7 @@ void setup() {
 }
 
 void loop() {
-  compute()
+  compute();
 }
 
 /* Configure digital pins 9 and 10 as 12-bit PWM outputs (3905 Hz). */
