@@ -20,7 +20,7 @@ float errorP=0;
 float errorI=0;
 float errorD=0;
 float errorL=0;
-float m=3.82;
+float m=3.8;
 float kp, ki, kd;
 
 // Execution Time Control
@@ -54,9 +54,11 @@ void compute(void){
     errorD=(errorP-errorL)/Ts;
     
     
-    U_t = (kp*errorP)*m+U_op;   
+    U_t = (kp*errorP)*m+(ki*errorI)*m+U_op;   
     float U_tl = min(max(U_t, 0), Uunits); // Saturated Control Output
     pwmV = int((U_tl/Uunits)*pwmMax);
+
+    errorL=errorP;
     analogWriteADJ(pwmPin, pwmV);
     
   
@@ -166,7 +168,7 @@ void setup() {
     Serial.println();
   clear=clear +1;    
   }  
-  SetTunings(1,0,0);
+  SetTunings(1.3,0.05,0);
   delay(5000);
 }
 
