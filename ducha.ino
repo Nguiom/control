@@ -50,20 +50,19 @@ void compute(void){
     sensors.requestTemperatures();  
     tempF = sensors.getTempCByIndex(0); 
     errorP=ref-tempF;
-    errorI=errorI+(errorP*Ts);
+    errorI=errorI+(errorP*Ts)/1000;
     errorD=(errorP-errorL)/Ts;
     
     
     U_t = (kp*errorP)*m+(ki*errorI)*m+U_op;   
-    float U_tl = min(max(U_t, 0), Uunits); // Saturated Control Output
+    float U_tl = min(max(U_t,0), Uunits); // Saturated Control Output
     pwmV = int((U_tl/Uunits)*pwmMax);
 
     errorL=errorP;
     analogWriteADJ(pwmPin, pwmV);
-    
-  
+   
     Serial.print("U:");
-    Serial.print(U_t);
+    Serial.print(U_tl);
     Serial.print(",");
 
     Serial.print("tempF:");
@@ -78,38 +77,6 @@ void compute(void){
     parseData();
     newData = false;
   }  
-  
-}
-
-void calibracion(void){
-  // Measurement, Control, Output Command Signal, Serial Data Communication
-  unsigned long currentMillis = millis(); // Update current time from the beginning
-  if (currentMillis - previousMillis >= Ts) {
-    previousMillis = currentMillis;
-    sensors.requestTemperatures();  
-    tempF = sensors.getTempCByIndex(0); 
-    U_t = U_op;   
-    float U_tl = min(max(U_t, 0), Uunits); // Saturated Control Output
-    pwmV = int((U_tl/Uunits)*pwmMax);
-    analogWriteADJ(pwmPin, pwmV);
-    
-  
-    Serial.print("U:");
-    Serial.print(U_t);
-    Serial.print(",");
-
-    Serial.print("tempF:");
-    Serial.println(tempF);     
-  }
-
-
-
-  // Advanced Serial Input Functions
-  recvWithStartEndMarkers();  
-  if (newData == true) {
-    parseData();
-    newData = false;
-  }
   
 }
 
