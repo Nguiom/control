@@ -15,6 +15,7 @@ unsigned int pwmV=0;
 float ref=37;
 float U_op = 50.0; // Direct Control Output - FOR OPENLOOP or FEEDFORWARD - Transistor Collector Current [mA]
 float U_t = 0.0; // Control Output
+float U_p=0.0;
 float U_id=0;
 float errorP=0;
 float errorI=0;
@@ -45,7 +46,7 @@ void SetTunings(double Kp, double Ki, double Kd)
 
 void compute(void){
   unsigned long currentMillis = millis(); // Update current time from the beginning
-  if (currentMillis - previousMillis >= Ts) {
+  if (currentMillis - previousMillis >= Ts && currentMillis>=120000) {
     previousMillis = currentMillis;
     sensors.requestTemperatures();  
     tempF = sensors.getTempCByIndex(0); 
@@ -54,11 +55,13 @@ void compute(void){
     errorD=(errorP-errorL)/Ts;
     
     
-    U_t = (kp*errorP)*m+(ki*errorI)*m+U_op;   
+    //U_t = (kp*errorP)*m+(ki*errorI)*m+U_op; 
+    U_t=U_p+5.035*errorP-4.845*errorL;  
     float U_tl = min(max(U_t,0), Uunits); // Saturated Control Output
     pwmV = int((U_tl/Uunits)*pwmMax);
 
     errorL=errorP;
+    U_p=U_t;
     analogWriteADJ(pwmPin, pwmV);
    
     Serial.print("U:");
@@ -67,6 +70,9 @@ void compute(void){
 
     Serial.print("tempF:");
     Serial.println(tempF);     
+  } else{
+    ident(currentMillis);
+
   }
 
 
@@ -80,29 +86,17 @@ void compute(void){
   
 }
 
-void ident(void){
+void ident(unsigned long currentMillis){
   // Measurement, Control, Output Command Signal, Serial Data Communication
-  unsigned long currentMillis = millis(); // Update current time from the beginning
+ // Update current time from the beginning
   if (currentMillis - previousMillis >= Ts) {
     previousMillis = currentMillis;
     sensors.requestTemperatures();  
     tempF = sensors.getTempCByIndex(0); 
-    U_t = U_id+U_op;   
+    U_t = 75;   
     float U_tl = min(max(U_t, 0), Uunits); // Saturated Control Output
     pwmV = int((U_tl/Uunits)*pwmMax);
     analogWriteADJ(pwmPin, pwmV);
-    
-    if (currentMillis >= 60000 && currentMillis-previousMillis2 >= 30000) {
-    i++;
-    previousMillis2 = currentMillis; // refresh the last time you RUN
-    if (up){
-      U_id = 10;
-      up = false;
-    } else {
-       U_id = 0;
-      up = true;
-    }
-  }
   
     Serial.print("U:");
     Serial.print(U_t);
@@ -112,14 +106,6 @@ void ident(void){
     Serial.println(tempF);     
   }
 
-
-
-  // Advanced Serial Input Functions
-  recvWithStartEndMarkers();  
-  if (newData == true) {
-    parseData();
-    newData = false;
-  }
   
 }
 
