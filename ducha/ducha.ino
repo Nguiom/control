@@ -46,7 +46,7 @@ void SetTunings(double Kp, double Ki, double Kd)
 
 void compute(void){
   unsigned long currentMillis = millis(); // Update current time from the beginning
-  if (currentMillis - previousMillis >= Ts && currentMillis>=120000) {
+  if (currentMillis - previousMillis >= Ts && currentMillis>=30000) {
     previousMillis = currentMillis;
     sensors.requestTemperatures();  
     tempF = sensors.getTempCByIndex(0); 
