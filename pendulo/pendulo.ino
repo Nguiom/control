@@ -1,17 +1,16 @@
-#include "AS5600.h"
 
 const int pinMotor1=9;
-const int sentidoMotor1=8;
-unsigned int pwmMotor1=0;
+const int pinInvMotor1=10;
 const int Uunits =100;
 const int pwmMax =4095;
 long last=0;
 long Ts=100;
-const int sensor=0;
+const int sensor=1;
+bool sentido=false;
 
 float angle=0.0;
 float ref =170;
-float U_dc=50;
+float U_dc=10;
 float U_t=0.0;
 
 const byte numChars = 32;
@@ -26,20 +25,27 @@ void pruebas(){
     
   U_t=U_dc;  
   float U_tl = min(max(U_t,0), Uunits); // Saturated Control Output
-  pwmMotor1=int((U_tl/Uunits)*pwmMax);
-  digitalWrite(sentidoMotor1,HIGH);
-  analogWriteADJ(pinMotor1,pwmMotor1);
+  int pwmMotor1=int((U_tl/Uunits)*pwmMax);
+  if(sentido){
+    analogWriteADJ(pinInvMotor1,pwmMotor1);
+    analogWriteADJ(pinMotor1,0);
+  }else {
+    analogWriteADJ(pinInvMotor1,0);
+    analogWriteADJ(pinMotor1,pwmMotor1);
   }
+  
+  }
+  
 
-  angle=analogRead(sensor)*AS5600_RAW_TO_DEGREES;
+  int medida=analogRead(sensor);
+  medida=map(medida,0,1024,0,359)-135;
   
 
     Serial.print("tiempo:");
     Serial.print(tiempo);
     Serial.print(",");
-
-    Serial.print("angulo");
-    Serial.println(angle); 
+    Serial.print(",angulo:");
+    Serial.println(medida); 
 
   recvWithStartEndMarkers();  
   if (newData == true) {
@@ -52,7 +58,6 @@ void pruebas(){
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  pinMode(sentidoMotor1, OUTPUT);
   setupPWMadj();
   int clear=0;
   while(clear<10){
@@ -126,5 +131,4 @@ void recvWithStartEndMarkers() {
 void parseData() {      // split the data into its parts
 
     ref = atof(receivedChars);     // convert serial input to a float and update System Reference value with that value
-
 }
