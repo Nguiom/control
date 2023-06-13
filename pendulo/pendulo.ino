@@ -137,6 +137,7 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   //simulacion();
+  control(29.5,90);
 }
 
 /* Configure digital pins 9 and 10 as 12-bit PWM outputs (3905 Hz). */
