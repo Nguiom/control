@@ -13,101 +13,86 @@ float ref =170;
 float U_dc=0;
 float U_t=0.0;
 
-float x[]={0,0};
-float xdot[]={0,0};
-float u[]={0.0,0.0};
+float x[]={0,0,0,0};
+float u[]={0,0};
 float gain=0;
 float y=0;
 float yR=0;
 
-float A[]={0,1,-83.5886,-0.674};
-float B[]={0,2.8474};
+float A[]={0.6189,0.08379,-7.003,0.5624};
+float B[]={0.01298,0.2386};
 float C[]={1,0};
-float L[]={79.326,2362.946};
-float K[]={5.7636,5.3824};
+float K[]={18.3959,4.5633};
+float L[]={1.5146,-0.4732};
+
+struct ganancias {
+  float op;
+  int angle;
+  float *a;
+  float *b;
+  float *c;
+  float *k;
+  float *l;  
+};
+
+ganancias neutro={29.5,90,A,B,C,K,L};
+
 
 const byte numChars = 32;
 char receivedChars[numChars];
 boolean newData = false;
 
-void pruebas(){
- 
+void control(ganancias op){
+
   unsigned long tiempo = millis();
-
-  if (tiempo - last >= Ts ){
-    
-  U_t=U_dc;  
-  float U_tl = min(max(U_t,0), Uunits); // Saturated Control Output
-  int pwmMotor1=int((U_tl/Uunits)*pwmMax);
-  if(sentido){
-    analogWriteADJ(pinInvMotor1,pwmMotor1);
-    analogWriteADJ(pinMotor1,0);
-  }else {
-    analogWriteADJ(pinInvMotor1,0);
-    analogWriteADJ(pinMotor1,pwmMotor1);
-  }
-  
-  }
-  
-
   int medida=analogRead(sensor);
-  medida=map(medida,0,1024,0,359)-135;
-  
-
-    Serial.print("tiempo:");
-    Serial.print(tiempo);
-    Serial.print(",");
-    Serial.print(",angulo:");
-    Serial.println(medida); 
-
-  recvWithStartEndMarkers();  
-  if (newData == true) {
-    parseData();
-    newData = false;
-  }  
-
-}
-
-void control(float op, int angle){
-
-  int medida=analogRead(sensor);
-  yR=map(medida,0,1024,0,3.1416*2)-((135+angle)*3.1416)/180;
+  yR=map(medida,0,1024,0,359)-(135+op.angle);
+  yR=float(yR)*(3.14159/180.0);
   
   
-  unsigned long tiempo = millis()/1000-last;
+  if (tiempo-last>= 100 && tiempo >=10000){
   
-  
-  if (tiempo>= Ts ){
+  u[0]=(yR-y) * (*(op.l));
+  u[1]=(yR-y) * (*(op.l+1));
+  x[2]=(x[0] * (*op.a))+(x[1] * (*(op.a+1)))+(gain * (*op.b))+u[0];
+  x[3]=(x[0] * (*(op.a+2)))+(x[1] * (*(op.a+3)))+(gain * (*(op.b+1)))+u[1];
+  gain=-(x[0] * (*op.k))+(x[1] * (*(op.k+1)));
+  y=(x[0] * (*op.c))+(x[1] * (*(op.c+1)));
+  x[0]=x[2];
+  x[1]=x[3];
 
-  
-  u[0]=(yR-y)*L[0];
-  u[1]=(yR-y)*L[1];
-  xdot[0]=u[0]+gain*B[0]+x[0]*A[0]+x[1]*A[1];
-  xdot[1]=u[1]+gain*B[1]+x[0]*A[2]+x[1]*A[3];
-  x[0]=x[0]+xdot[0]*tiempo;
-  x[1]=x[1]+xdot[1]*tiempo;
-  gain=x[0]*K[0]+x[1]*K[1];
-  y=x[0]*C[0]+x[1]*C[1];
-
-  U_t=gain+op;
-
-  float U_tl = min(max(U_t,0), Uunits); // Saturated Control Output
-  int pwmMotor1=int((U_tl/Uunits)*pwmMax);
-  if(sentido){
-    analogWriteADJ(pinInvMotor1,pwmMotor1);
-    analogWriteADJ(pinMotor1,0);
-  }else {
-    analogWriteADJ(pinInvMotor1,0);
-    analogWriteADJ(pinMotor1,pwmMotor1);
-  }
-  }
+  U_t=gain+op.op;
 
   last=tiempo;
+  
+  }else if(tiempo <10000){
 
-  Serial.print("posicion:");
+    y=yR;
+    x[0]=yR;
+    gain=-(x[0] * (*op.k))+(x[1] * (*(op.k+1)));
+    U_t=24;
+  }
+
+  float U_tl = min(max(U_t,0), Uunits); // Saturated Control Output
+  int pwmMotor1=int((U_tl/Uunits)*pwmMax);
+
+  if(sentido){
+    analogWriteADJ(pinInvMotor1,pwmMotor1);
+    analogWriteADJ(pinMotor1,0);
+  }else {
+    analogWriteADJ(pinInvMotor1,0);
+    analogWriteADJ(pinMotor1,pwmMotor1);
+  }
+
+  
+
+  Serial.print("tiempo: ");
+  Serial.print(tiempo);
+  Serial.print(" posicion: ");
   Serial.print(yR);
-  Serial.print("PWM");
-  Serial.print(U_t);
+  Serial.print(" u ");
+  Serial.print(u[0]);
+  Serial.print('\n');
 
   recvWithStartEndMarkers();  
   if (newData == true) {
@@ -126,8 +111,6 @@ void setup() {
     Serial.println();
   clear=clear +1;    
   }
-
-  
   
   delay(5000);
 
@@ -137,7 +120,7 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   //simulacion();
-  control(29.5,90);
+  control(neutro);
 }
 
 /* Configure digital pins 9 and 10 as 12-bit PWM outputs (3905 Hz). */
