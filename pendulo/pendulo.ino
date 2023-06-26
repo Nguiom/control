@@ -12,18 +12,27 @@ float angle=0.0;
 float ref =170;
 float U_dc=0;
 float U_t=0.0;
+float suerte=0.0;
+float inercia=(0.14163*0.005+0.013*0.0445)*9.7774;
 
 float x[]={0,0,0,0};
 float u[]={0,0};
 float gain=0;
 float y=0;
 float yR=0;
+int medida=0;
+unsigned long tiempo = 0;
 
 float A[]={0.6189,0.08379,-7.003,0.5624};
 float B[]={0.01298,0.2386};
 float C[]={1,0};
 float K[]={18.3959,4.5633};
 float L[]={1.5146,-0.4732};
+float v=0;
+float vF[]={0,0};
+int i=0;
+float vI=0;
+float vIF=0;
 
 struct ganancias {
   float op;
@@ -35,8 +44,7 @@ struct ganancias {
   float *l;  
 };
 
-ganancias neutro={29.5,90,A,B,C,K,L};
-
+ganancias neutro[]={{29.5,90,A,B,C,K,L},{28.910,100,A,B,C,K,L}};
 
 const byte numChars = 32;
 char receivedChars[numChars];
@@ -44,33 +52,37 @@ boolean newData = false;
 
 void control(ganancias op){
 
-  unsigned long tiempo = millis();
-  int medida=analogRead(sensor);
-  yR=map(medida,0,1024,0,359)-(135+op.angle);
+  
+  yR=map(medida,0,1024,0,359)-(135-48+op.angle);
   yR=float(yR)*(3.14159/180.0);
   
+  if (tiempo-last>= 500 && tiempo >=15000){
   
-  if (tiempo-last>= 100 && tiempo >=10000){
-  
-  u[0]=(yR-y) * (*(op.l));
-  u[1]=(yR-y) * (*(op.l+1));
-  x[2]=(x[0] * (*op.a))+(x[1] * (*(op.a+1)))+(gain * (*op.b))+u[0];
-  x[3]=(x[0] * (*(op.a+2)))+(x[1] * (*(op.a+3)))+(gain * (*(op.b+1)))+u[1];
-  gain=-(x[0] * (*op.k))+(x[1] * (*(op.k+1)));
-  y=(x[0] * (*op.c))+(x[1] * (*(op.c+1)));
-  x[0]=x[2];
-  x[1]=x[3];
+  v=(yR-y)/(float(tiempo-last)/1000);
+  vF[1]=0.3679*vF[0]+0.6321*v;
+  gain=-(yR*2.5485*1-vF[1]*(1.7545*1));
 
   U_t=gain+op.op;
 
   last=tiempo;
+  y=yR;
+  vF[0]=vF[1];
   
-  }else if(tiempo <10000){
+  
+  }else if(tiempo <10000 && tiempo-last>= 500){
 
+    v=(yR-y)/(float(tiempo-last)/1000);
+    vF[1]=0.3679*vF[0]+0.6321*v;
     y=yR;
-    x[0]=yR;
-    gain=-(x[0] * (*op.k))+(x[1] * (*(op.k+1)));
-    U_t=24;
+    last=tiempo;
+    U_t=26;
+  }else if(tiempo <15000 && tiempo>=10000&& tiempo-last>= 500){
+
+    v=(yR-y)/(float(tiempo-last)/1000);
+    vF[1]=0.3679*vF[0]+0.6321*v;
+    y=yR;
+    last=tiempo;
+    U_t=29.5;
   }
 
   float U_tl = min(max(U_t,0), Uunits); // Saturated Control Output
@@ -86,12 +98,12 @@ void control(ganancias op){
 
   
 
-  Serial.print("tiempo: ");
-  Serial.print(tiempo);
-  Serial.print(" posicion: ");
-  Serial.print(yR);
-  Serial.print(" u ");
-  Serial.print(u[0]);
+  Serial.print("yR ");
+  Serial.print(yR*(180/3.14159));
+  Serial.print(" u_tl ");
+  Serial.print(U_tl);
+  Serial.print(" modo ");
+  Serial.print(vIF);
   Serial.print('\n');
 
   recvWithStartEndMarkers();  
@@ -106,11 +118,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   setupPWMadj();
-  int clear=0;
-  while(clear<10){
-    Serial.println();
-  clear=clear +1;    
-  }
+  pepe();
   
   delay(5000);
 
@@ -120,7 +128,46 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   //simulacion();
-  control(neutro);
+  tiempo = millis();
+  
+  medida=analogRead(sensor);
+  yR=map(medida,0,1024,0,359)-(135-51+90);
+
+  control(neutro[0]);
+
+  if(abs(yR-y)<=0.0785&&abs(yR)>=0.0785&&tiempo-last>= 500){
+    i=i+1;
+    if(i>=10000){
+      suerte=(cos(yR)*inercia)/(0.014163*neutro[0].op);
+      neutro[0].op=inercia/(0.14163*suerte);
+    }
+  }else{
+    i=0;
+  }
+}
+
+void pepe(){
+Serial.println(F("  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀"));
+Serial.println(F("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣴⡶⠟⠛⠉⠉⠉⠙⠛⠷⣦⣀⠀⢀⣠⣤⣶⠶⠾⠿⠶⣶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀"));
+Serial.println(F("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡾⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣿⡟⠉⠁⠀⠀⠀⠀⠀⠀⠙⢿⣄⠀⠀⠀⠀⠀⠀⠀⠀"));
+Serial.println(F("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⠏⠀⠀⢀⣤⣴⠶⠟⠛⠛⠛⠛⠶⢶⣤⣼⣿⡀⢀⣀⣀⣀⣀⣀⣀⣀⣈⣿⡆⠀⠀⠀⠀⠀⠀⠀"));
+Serial.println(F("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⠏⠀⠀⠀⠛⠉⠀⠀⠀⠀⠀⠀⣀⣀⣠⣬⣽⣿⣿⡛⠋⠉⠉⣉⣉⣉⣉⣿⣿⣿⣶⣦⣄⡀⠀⠀⠀"));
+Serial.println(F("⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⠏⠀⠀⠀⠀⠀⠀⠀⣀⣤⣶⢶⣻⣯⣽⣿⣿⣿⣿⣿⣿⣷⣄⠀⣛⣉⣩⣭⣯⣿⣿⣿⣭⣝⣻⣦⠀⠀"));
+Serial.println(F("⠀⠀⠀⠀⠀⠀⢀⣤⣶⠟⠁⠀⠀⠀⠀⠀⣀⣶⢟⣻⣽⡾⠟⠋⠉⠀⢀⣀⣀⣠⣤⣭⣽⣿⡟⠛⣉⣉⣭⣴⣶⣤⣤⣬⣭⣿⣿⣦⠀"));
+Serial.println(F("⠀⠀⠀⠀⠀⢠⡿⠋⠀⠀⠀⠀⠀⠀⠀⣾⣿⣿⣿⣉⣁⣀⣤⣴⢶⣿⠿⣿⣿⣯⡉⠀⠈⣿⡿⠛⠛⠉⢉⣿⡛⣿⢿⣷⡄⠉⠙⣿⡆"));
+Serial.println(F("⠀⠀⠀⠀⣠⡿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⢹⣿⣿⣭⣁⠀⣼⣿⡶⣿⣁⣸⣿⣤⣾⣿⣤⣀⣀⣀⣾⣿⣻⣧⣀⣿⣿⣤⣶⡟⠁"));
+Serial.println(F("⠀⠀⢀⣴⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠋⠈⠉⠉⠛⠛⠛⠛⠛⠛⢋⣿⡟⠋⠀⠀"));
+Serial.println(F("⠀⢀⣾⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠉⣉⣭⣿⠿⠋⠀⠀⠰⢷⣦⣄⣠⣤⣤⣤⣤⣶⠟⠋⠀⠀⠀⠀"));
+Serial.println(F("⢀⣾⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⠾⠛⠛⠉⠀⠀⠀⠀⠀⠀⠀⠈⠙⠿⣯⠉⠀⠈⠻⣦⡀⠀⠀⠀⠀"));
+Serial.println(F("⢸⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣷⡄⠀⠀⠀"));
+Serial.println(F("⢸⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣤⣤⣴⣦⣤⣤⣤⣤⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣤⣤⡾⣷⡄⠀⠀"));
+Serial.println(F("⠀⢿⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⡟⠉⢀⣤⣤⣤⣄⣀⣀⣉⠉⠙⠛⠻⠷⠶⠶⠶⠶⠶⠶⠾⠿⠟⠛⠛⠋⠉⠀⢀⣼⡇⠀⠀"));
+Serial.println(F("⠀⠘⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⠸⣧⣀⣀⣉⣀⣈⣉⣉⣙⡛⠻⠿⠶⠶⠶⣦⣤⣤⣤⣤⣤⣤⣤⣤⣤⡴⠶⠶⢾⡟⠋⠀⠀⠀"));
+Serial.println(F("⠀⠀⠘⢿⣦⡀⠀⠀⠀⠀⠀⠀⠀⢿⣦⣈⣛⠛⠋⠉⠉⠉⠉⠙⠛⠛⠿⠶⠶⣶⣤⣤⣤⣤⣀⣀⣀⣀⣀⣀⣀⣀⣤⡾⠃⠀⠀⠀⠀"));
+Serial.println(F("⠀⠀⠀⠀⠙⣿⣶⣤⣀⡀⠀⠀⠀⠀⠉⠙⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠉⣉⣿⠿⠋⠉⠉⠀⠀⠀⠀⠀⠀"));
+Serial.println(F("⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣿⣷⣶⣤⣤⣄⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣠⣤⣤⣶⠾⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀"));
+Serial.println(F("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠛⠛⠿⠿⣯⣿⣿⣛⣛⣛⣛⣛⣛⣛⣛⣛⣛⣛⣛⣿⡿⠟⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀"));
+Serial.println(F("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠉⠉⠉⠛⠛⠛⠋⠉⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀"));
 }
 
 /* Configure digital pins 9 and 10 as 12-bit PWM outputs (3905 Hz). */
