@@ -138,7 +138,7 @@ void loop() {
   if(abs(yR-y)<=0.0785&&abs(yR)>=0.0785&&tiempo-last>= 500){
     i=i+1;
     if(i>=10000){
-      suerte=(cos(yR)*inercia)/(0.014163*neutro[0].op);
+      suerte=(cos(yR)*inercia)/(0.014163*U_tl);
       neutro[0].op=inercia/(0.14163*suerte);
     }
   }else{
